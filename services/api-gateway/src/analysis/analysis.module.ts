@@ -1,0 +1,9 @@
+import { Module } from '@nestjs/common';
+import { HttpModule } from '@nestjs/axios';
+import { AnalysisController } from './analysis.controller';
+
+@Module({
+  imports: [HttpModule],
+  controllers: [AnalysisController],
+})
+export class AnalysisModule {}
