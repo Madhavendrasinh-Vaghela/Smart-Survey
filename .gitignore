@@ -1,0 +1,41 @@
+# Environment files
+.env
+.env.local
+.env.*.local
+
+# Dependencies
+node_modules/
+package-lock.json  # Or yarn.lock if using Yarn
+
+# Builds
+dist/
+build/
+
+# Prisma
+prisma/migrations/*.sql
+prisma/dev.db
+
+# Logs and caches
+*.log
+coverage/
+.nyc_output
+
+# IDE
+.vscode/
+.idea/
+.DS_Store
+
+# Virtualenvs and deps
+venv/
+env/
+.venv/
+node_modules/
+dist/
+build/
+prisma/migrations/*.sql
+.env*
+
+# Python bytecode
+__pycache__/
+*.py[cod]
+*$py.class
