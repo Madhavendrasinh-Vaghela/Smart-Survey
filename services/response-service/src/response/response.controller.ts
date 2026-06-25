@@ -1,23 +1,17 @@
-import { Controller, Post, Body, Get, Query } from '@nestjs/common';
+import { Controller, Get, Post, Body, Query } from '@nestjs/common';
 import { ResponseService } from './response.service';
 
 @Controller('responses')
 export class ResponseController {
-  constructor(private readonly responseService: ResponseService) {}
+  constructor(private readonly responsesService: ResponseService) {}
 
   @Post()
-  async submitResponse(@Body() body: any) {
-    if (body.responses && Array.isArray(body.responses)) {
-      return this.responseService.createBatchResponse(
-        body.surveyId,
-        body.responses,
-      );
-    }
-    return this.responseService.createResponse(body);
+  create(@Body() body: any) {
+    return this.responsesService.create(body);
   }
 
   @Get()
-  async getResponses(@Query('surveyId') surveyId: string) {
-    return this.responseService.getResponsesBySurvey(surveyId);
+  findBySurvey(@Query('surveyId') surveyId: string) {
+    return this.responsesService.findBySurveyId(surveyId);
   }
 }

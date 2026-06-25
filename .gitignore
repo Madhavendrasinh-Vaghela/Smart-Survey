@@ -39,3 +39,5 @@ prisma/migrations/*.sql
 __pycache__/
 *.py[cod]
 *$py.class
+
+docker-compose.yml

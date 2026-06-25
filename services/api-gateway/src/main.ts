@@ -5,13 +5,16 @@ async function bootstrap() {
   const app = await NestFactory.create(AppModule);
 
   app.enableCors({
-    origin: 'http://localhost:5173', // React app
-    methods: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
+    origin: [
+      'http://localhost:5173',
+      'http://localhost:5174',
+    ],
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization'],
-    credentials: false, // true only if you use cookies
+    credentials: true,
   });
 
-  await app.listen(3000);
-  console.log(`API Gateway running on ${await app.getUrl()}`);
+  await app.listen(process.env.PORT || 3000);
+  console.log(`API Gateway running on port ${process.env.PORT || 3000}`);
 }
 bootstrap();

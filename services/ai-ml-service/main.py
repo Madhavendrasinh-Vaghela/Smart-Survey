@@ -5,78 +5,94 @@ from typing import List
 
 app = FastAPI()
 
-print("⏳ Loading BART model...")
-summarizer = pipeline(
-    "summarization",
-    model="facebook/bart-base"
-)
-print("✅ Model loaded")
-
-
-# ---------- CONFIG ----------
-MAX_WORDS_PER_CHUNK = 400   # safe for BART
-CHUNK_SUMMARY_MIN = 50
-CHUNK_SUMMARY_MAX = 150
-FINAL_SUMMARY_MIN = 80
-FINAL_SUMMARY_MAX = 200
-# ----------------------------
-
+print("Loading BART model...")
+summarizer = pipeline("summarization", model="facebook/bart-large-cnn")
+print("Model loaded")
 
 class AnalyzeRequest(BaseModel):
     surveyId: str
     responses: List[str]
 
-
-def chunk_text(text: str, max_words: int):
-    words = text.split()
-    chunks = []
-    for i in range(0, len(words), max_words):
-        chunk = " ".join(words[i:i + max_words])
-        chunks.append(chunk)
-    return chunks
-
-
-def summarize_chunks(chunks: List[str]) -> List[str]:
-    summaries = []
-    for idx, chunk in enumerate(chunks):
-        print(f"🧠 Summarizing chunk {idx + 1}/{len(chunks)}")
-        result = summarizer(
-            chunk,
-            max_length=CHUNK_SUMMARY_MAX,
-            min_length=CHUNK_SUMMARY_MIN,
-            do_sample=False
-        )
-        summaries.append(result[0]["summary_text"])
-    return summaries
-
+def is_meaningful(text: str) -> bool:
+    """Filter out ratings, numbers, single words"""
+    text = text.strip()
+    if not text:
+        return False
+    # Skip if it's just a number (ratings like "1","2","3","4","5")
+    if text.isdigit():
+        return False
+    # Skip very short answers (less than 3 words)
+    if len(text.split()) < 3:
+        return False
+    return True
 
 @app.post("/analyze")
 def analyze(data: AnalyzeRequest):
-    # 1️⃣ Combine all responses
-    combined_text = " ".join(data.responses)
+    # Filter only meaningful text answers
+    meaningful = [r for r in data.responses if is_meaningful(r)]
 
-    # 2️⃣ Split into chunks
-    chunks = chunk_text(combined_text, MAX_WORDS_PER_CHUNK)
-    print(f"🔹 Total chunks created: {len(chunks)}")
+    # If no meaningful text answers, generate a rating summary instead
+    if not meaningful:
+        numbers = []
+        for r in data.responses:
+            try:
+                numbers.append(float(r.strip()))
+            except:
+                pass
 
-    # 3️⃣ Summarize each chunk
-    chunk_summaries = summarize_chunks(chunks)
+        if numbers:
+            avg = sum(numbers) / len(numbers)
+            summary = (
+                f"Survey received {len(data.responses)} responses. "
+                f"The average rating across all questions was {avg:.1f} out of 5. "
+                f"Ratings ranged from {int(min(numbers))} to {int(max(numbers))}. "
+                f"Overall sentiment appears {'positive' if avg >= 3.5 else 'neutral' if avg >= 2.5 else 'negative'}."
+            )
+        else:
+            summary = f"Survey received {len(data.responses)} responses. No detailed text feedback was provided."
 
-    # 4️⃣ Combine chunk summaries
-    combined_summary_text = " ".join(chunk_summaries)
+        return {
+            "surveyId": data.surveyId,
+            "totalResponses": len(data.responses),
+            "summary": summary
+        }
 
-    # 5️⃣ Final summarization (summary of summaries)
-    print("🔥 Creating final summary")
-    final_summary = summarizer(
-        combined_summary_text,
-        max_length=FINAL_SUMMARY_MAX,
-        min_length=FINAL_SUMMARY_MIN,
-        do_sample=False
-    )[0]["summary_text"]
+    # Combine meaningful text answers
+    combined = ". ".join(meaningful)
+
+    # Chunk into 900-char pieces for BART
+    chunk_size = 900
+    chunks = [combined[i:i+chunk_size] for i in range(0, len(combined), chunk_size)]
+
+    summaries = []
+    for i, chunk in enumerate(chunks):
+        if len(chunk.split()) < 10:
+            summaries.append(chunk)
+            continue
+        print(f"Summarizing chunk {i+1}/{len(chunks)}")
+        result = summarizer(
+            chunk,
+            max_length=150,
+            min_length=40,
+            do_sample=False
+        )
+        summaries.append(result[0]["summary_text"])
+
+    final_summary = " ".join(summaries)
+
+    # If multiple chunks, summarize the summaries
+    if len(summaries) > 1 and len(final_summary.split()) > 50:
+        print("Creating final combined summary...")
+        result = summarizer(
+            final_summary,
+            max_length=180,
+            min_length=60,
+            do_sample=False
+        )
+        final_summary = result[0]["summary_text"]
 
     return {
         "surveyId": data.surveyId,
         "totalResponses": len(data.responses),
-        "totalChunks": len(chunks),
         "summary": final_summary
     }
